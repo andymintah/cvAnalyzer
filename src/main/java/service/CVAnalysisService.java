@@ -3,8 +3,7 @@ import dto.MCPResponse;
 import model.JobRequirement;
 import model.MatchScore;
 import model.CvData;
-import repository.MatchScoreRepository;
-import repository.ResumeDataRepository;
+import repository.CVDataRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
@@ -12,11 +11,9 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import repository.MatchScoreRepository;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
@@ -27,7 +24,7 @@ import java.util.stream.Collectors;
 public class CVAnalysisService {
     private final DocumentParsingService documentParsingService;
     private final MCPService mcpService;
-    private final ResumeDataRepository resumeRepository;
+    private final CVDataRepository cvRepository;
     private final MatchScoreRepository matchScoreRepository;
     private final FileStorageService fileStorageService;
 
@@ -59,17 +56,17 @@ public class CVAnalysisService {
         resumeData.setAchievements(String.join("; ", analysisResult.getAchievements()));
         resumeData.setCertifications(String.join("; ", analysisResult.getCertifications()));
 
-        return resumeRepository.save(resumeData);
+        return cvRepository.save(resumeData);
     }
 
     @Transactional
-    public MatchScore analyzeResumeMatch(Long resumeId, Long jobRequirementId) {
+    public MatchScore analyzeResumeMatch(Long resumeId, Long jobRequirementId) throws Throwable {
         log.info("Analyzing resume match for resume ID: {} and job ID: {}", resumeId, jobRequirementId);
 
-        CvData resume = resumeRepository.findById(resumeId)
+        CvData resume = cvRepository.findById(resumeId)
                 .orElseThrow(() -> new RuntimeException("Resume not found"));
 
-        JobRequirement jobRequirement = resumeRepository.findJobRequirementById(jobRequirementId)
+        JobRequirement jobRequirement = cvRepository.findJobRequirementById(jobRequirementId)
                 .orElseThrow(() -> new RuntimeException("Job requirement not found"));
 
         // Prepare job requirements for MCP service
@@ -114,6 +111,8 @@ public class CVAnalysisService {
                     } catch (Exception e) {
                         log.error("Error analyzing resume {}: {}", resumeId, e.getMessage());
                         return null;
+                    } catch (Throwable e) {
+                        throw new RuntimeException(e);
                     }
                 })
                 .filter(Objects::nonNull)

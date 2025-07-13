@@ -1,6 +1,11 @@
 package service;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.pdfbox.io.IOUtils;
+import org.apache.pdfbox.io.RandomAccessReadBuffer;
+import org.apache.pdfbox.pdfparser.PDFParser;
 import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.Loader;
+
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.extractor.XWPFWordExtractor;
@@ -31,9 +36,18 @@ public class DocumentParsingService {
     }
 
     private String extractTextFromPDF(InputStream inputStream) throws IOException {
-        try (PDDocument document = PDDocument.load(inputStream)) {
+        byte[] pdfBytes = IOUtils.toByteArray(inputStream);
+
+        RandomAccessReadBuffer rar = new RandomAccessReadBuffer(pdfBytes);
+
+        PDFParser parser = new PDFParser(rar);
+        PDDocument document  = parser.parse();
+        try (document) {
             PDFTextStripper pdfStripper = new PDFTextStripper();
             return pdfStripper.getText(document);
+        } catch (IOException e) {
+            log.error("Error loading PDF document: {}", e.getMessage());
+            throw new IOException("Failed to load PDF document", e);
         }
     }
 
